@@ -4,7 +4,7 @@ package godis
 import(
 	"sync"
 	"log"
-	"github.com/garyburd/redigo/redis"
+	"strings"
 )
 
 
@@ -32,25 +32,21 @@ func NewServer(host string) (*Server) {
 
 
 
-func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{}) (interface{}, error)) {
+func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{}) (interface{}, error), c chan int) {
 	go func() {
 		for _, h := range s.handleFuncs {
 			if h.TaskName == name {
 				return
 			}
 		}
-		psc := s.redisClient.pubSubConn
-		psc.Subscribe(name)
+		rec := make(chan []string)
+		go s.redisClient.conn.Subscribe(rec, name)
+
+		var ls []string
+		c <- 1
 		for {
-			switch v := psc.Receive().(type) {
-				case redis.Message:
-				log.Printf(" message: %s\n", v)
-				case redis.Subscription:
-				log.Printf("%s: %s %d\n", v.Channel, v.Kind, v.Count)
-				break
-				case error:
-				return
-			}
+			ls = <-rec
+			log.Printf("Consumer received: %v\n", strings.Join(ls, ", "))
 		}
 		s.handleFuncs = append(s.handleFuncs, &taskHandler{TaskName: name, HandlerFunc: handlerFunc})
 

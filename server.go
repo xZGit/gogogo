@@ -18,15 +18,16 @@ func main (){
 
 		return "Hello, " + v[0].(string), nil
 	}
-	server.RegisterTask("hello", &h)
 
-	server.RegisterTask("hello1", &h)
+	c := make(chan int, 1)
+	server.RegisterTask("hello", &h, c)
+
+	<-c
 
 	client:=godis.NewClient("127.0.0.1")
 
-	go client.Call("hello")
 
 	client.Call("hello")
-
+    go client.Call("hello")
 	<-exit
 }

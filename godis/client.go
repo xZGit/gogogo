@@ -3,7 +3,7 @@ package godis
 
 import(
 	"sync"
-	"log"
+    "log"
 
 )
 
@@ -31,18 +31,21 @@ func NewClient(host string) (*Client) {
 func (c *Client) Call(name string, arg ...interface{})  error {
     c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.redisClient.conn.Send("PUBLISH", name, "xxxx")
-	c.redisClient.conn.Flush()
+	log.Printf("reply")
+//	c.redisClient.getActiveSubPub()
+	c.redisClient.conn.Publish(name, "Hello world!")
 
-	for {
 
-		reply, err := c.redisClient.conn.Receive()
-		if err != nil {
-			return err
-		}
-		log.Printf("reply %s", reply)
-		// process pushed message
-	}
+
+//	for {
+//
+//		reply, err := c.redisClient.conn.Receive()
+//		if err != nil {
+//			return err
+//		}
+//		log.Printf("reply %s", reply)
+//		// process pushed message
+//	}
 
 
 
