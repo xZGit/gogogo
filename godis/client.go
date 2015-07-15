@@ -4,9 +4,8 @@ package godis
 import(
 	"sync"
     "log"
-
+	"time"
 )
-
 
 
 type Client struct {
@@ -17,9 +16,6 @@ type Client struct {
 
 
 
-
-
-
 func NewClient(host string) (*Client) {
 	return  &Client{
 		redisClient:NewRedisClient(host),
@@ -27,27 +23,30 @@ func NewClient(host string) (*Client) {
 }
 
 
-
-func (c *Client) Call(name string, arg ...interface{})  error {
+func (c *Client) Call(name string, handlerFunc *func(args []string) (interface{}, error), args ...interface{})  error {
     c.mutex.Lock()
 	defer c.mutex.Unlock()
 	log.Printf("reply")
-//	c.redisClient.getActiveSubPub()
-	c.redisClient.conn.Publish(name, "Hello world!")
+	c.redisClient.getActiveSubPub()
+	event, err:= newEvent(name, args)
+	if err != nil {
+		panic(err)
+	}
 
+	rec := make(chan []string)
+	go c.redisClient.subConn.Subscribe(rec, event.MsgId)
+	c.redisClient.pubConn.Publish(name, event)
+	var ls []string
 
-
-//	for {
-//
-//		reply, err := c.redisClient.conn.Receive()
-//		if err != nil {
-//			return err
-//		}
-//		log.Printf("reply %s", reply)
-//		// process pushed message
-//	}
-
-
+	for {
+		select {
+		case ls = <-rec:
+			log.Printf("Client received: %v\n", ls)
+		case <-time.After(5 * time.Second):
+//			println("timeout")
+			break
+		}
+	}
 
 	return nil
 }
