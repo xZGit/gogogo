@@ -3,7 +3,6 @@ package main
 
 import (
 	"./godis"
-
 )
 
 
@@ -14,9 +13,10 @@ func main (){
 
 	server:=godis.NewServer("127.0.0.1")
 
-	h := func(v []string) (interface{}, error) {
-
-		return "Hello, " + v[0], nil
+	h := func(v godis.ProtoType) (godis.ProtoType, error) {
+		dd := make(godis.ProtoType)
+		dd["dd"]="fff"
+		return dd, nil
 	}
 
 	c := make(chan int, 2)

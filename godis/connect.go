@@ -3,9 +3,7 @@ package godis
 
 import
 (
-//    "github.com/garyburd/redigo/redis"
      "sync"
-//	"fmt"
 	"menteslibres.net/gosexy/redis"
 	"log"
 )

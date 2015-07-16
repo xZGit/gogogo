@@ -5,7 +5,7 @@ import (
 	"sync"
 	"log"
 	uuid "github.com/nu7hatch/gouuid"
-	"strings"
+//	"strings"
 )
 
 
@@ -40,7 +40,7 @@ func NewServer(host string) (*Server) {
 
 
 
-func (s *Server) RegisterTask(name string, handlerFunc *func(args []string) (interface{}, error), c chan int) {
+func (s *Server) RegisterTask(name string, handlerFunc HandleServerFunc, c chan int) {
 	go func() {
 		for _, h := range s.handleFuncs {
 			if h.TaskName == name {
@@ -65,28 +65,26 @@ func (s *Server) RegisterTask(name string, handlerFunc *func(args []string) (int
 
 
 
-func (s *Server) ProcessFunc(handlerFunc *func(args []string) (interface{}, error), ls string) {
+func (s *Server) ProcessFunc(handlerFunc HandleServerFunc, ls string) {
 
-
-	l := len(ls)
-	data := ls[1:l-1]
-	strArray := strings.Fields(data)
-	sl := len(strArray)
-	var arg []string
-	arg =strArray[2:sl]
-	arg[0]=arg[0][1:]
-	last := len(arg)-1
-	arg[last]=arg[last][:len(arg[last])-1]
-
-	log.Printf("process func: %v\n", arg)
-
-	v, err := (*handlerFunc)(arg)
+	mySlice := []byte(ls)
+	log.Printf("mySlice: %v\n", mySlice)
+	ev, err := unPackEventBytes(mySlice)
 	if err != nil {
 		panic(err)
 	}
 
+	v, err := (*handlerFunc)(ev.Args)
+	var resp Resp
+	if err != nil {
+		resp = newResp(1,err.Error(),nil)
+	}else {
+		resp = newResp(0,"",v)
+	}
+	msg, err :=resp.packBytes()
 
- 	go s.redisClient.getActiveSubPub()
-	log.Printf("result: %v\n", strArray[0])
-	s.redisClient.pubConn.Publish(strArray[0],v)
+//
+// 	go s.redisClient.getActiveSubPub()
+	log.Printf("result: %v\n", ev.MsgId)
+	s.redisClient.pubConn.Publish(ev.MsgId,msg)
 }

@@ -3,7 +3,8 @@ package main
 
 import (
 	"./godis"
-
+    "errors"
+	"log"
 )
 
 
@@ -13,16 +14,20 @@ func main (){
 
 
 
-	h := func(v []string) (interface{}, error) {
+	h := func(v godis.ProtoType) (interface{}, error){
+		dd := make(godis.ProtoType)
+		dd["dd"]="fff"
+		log.Println("yes prcoess v%",v)
 
-		return "Hello, " + v[0], nil
+		return nil, errors.New("Ssss")
 	}
 
 
 	client:=godis.NewClient("127.0.0.1")
+	dd := make(godis.ProtoType)
+	dd["dd"]="fff"
 
-
-	client.Call("hello",&h,"sss","yyyy")
+	client.Call("hello",&h,dd)
 	//    go client.Call("hello")
 	<-exit
 }
