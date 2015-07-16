@@ -24,44 +24,47 @@ func NewClient(host string) (*Client) {
 
 
 
-func (c *Client) Call(name string, handlerFunc HandleClientFunc, args ProtoType)  error {
+func (c *Client) Call(name string, handlerFunc HandleClientFunc, args ProtoType,n int)  error {
     c.mutex.Lock()
 	defer c.mutex.Unlock()
-	log.Printf("reply")
-	c.redisClient.getActiveSubPub()
-	event, err:= newEvent(args)
-	if err != nil {
-		panic(err)
-	}
-	rec := make(chan []string)
-	go c.redisClient.subConn.Subscribe(rec, event.MsgId)
-	msg, err :=event.packBytes()
-	c.redisClient.pubConn.Publish(name, msg)
-	var ls []string
-
-	for {
-		select {
-		case ls = <-rec:
-			if ls[0]=="message" && len(ls)>2 {
-                go c.ProcessFunc(handlerFunc, ls[2])
-				go c.redisClient.subConn.Unsubscribe(event.MsgId)
-			}
-		case <-time.After(5 * time.Second):
-//			println("timeout")
-			break
+	exit := make(chan int)
+	go func() {
+		c.redisClient.getActiveSubPub()
+		event, err := newEvent(args)
+		if err != nil {
+			panic(err)
 		}
-	}
+		rec := make(chan []string)
+		go c.redisClient.subConn.Subscribe(rec, "cc")
+		msg, err := event.packBytes()
+		c.redisClient.pubConn.Publish(name, msg)
+		var ls []string
 
+		for {
+			select {
+			case ls = <-rec:
+				if ls[0]=="message" && len(ls)>2 {
+					go c.redisClient.subConn.Unsubscribe(event.MsgId)
+					go c.ProcessFunc(handlerFunc, ls[2],exit,n)
+
+				}
+			case <-time.After(5 * time.Second):
+			//			println("timeout")
+				break
+			}
+		}
+	}()
+	log.Println( <-exit)
 	return nil
 }
 
 
 
-func (c *Client) ProcessFunc(handlerFunc HandleClientFunc, ls string) {
+func (c *Client) ProcessFunc(handlerFunc HandleClientFunc, ls string, exit chan int,n int) {
 
-	log.Printf("Client received: %v\n", ls)
+//	log.Printf("Client received: %v\n", ls)
 	mySlice := []byte(ls)
-	log.Printf("Client received: %v\n", mySlice)
+
 	resp, err := unPackRespByte(mySlice)
 	if err != nil {
 		log.Printf("err: %v\n", err)
@@ -72,6 +75,6 @@ func (c *Client) ProcessFunc(handlerFunc HandleClientFunc, ls string) {
 	}
 
 	(*handlerFunc)(resp.Data)
-
+    exit <- n
 }
 

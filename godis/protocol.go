@@ -5,7 +5,6 @@ import
 	"errors"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/ugorji/go/codec"
-	"log"
 )
 
 
@@ -51,7 +50,6 @@ func newResp(code int64, err string, data ProtoType) (Resp){
     if err!="" {
 		r.ErrMsg=err
 	}
-	log.Printf("r: %v\n",r)
 	return r
 }
 
@@ -64,7 +62,6 @@ func (r *Resp) packBytes() ([]byte, error) {
 	if len(r.ErrMsg)>0{
 		data = append(data, r.ErrMsg)
 	}
-	log.Printf("data: %v\n",data)
    return encode(data)
 }
 
@@ -135,7 +132,6 @@ func unPackRespByte(b []byte) (*Resp, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("v: %v\n",v)
     code := convertValue(v.([]interface{})[0])
 	data := convertValue(v.([]interface{})[1])
 	r := Resp{

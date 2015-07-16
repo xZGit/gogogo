@@ -55,12 +55,10 @@ func NewRedisClient(host string) *RedisClient {
 func (redisClient *RedisClient) getActiveSubPub() {
 
 	var i []string
-	log.Printf("GET hello\n")
 	err := redisClient.conn.Command(&i, "PUBSUB", "CHANNELS")
 	if err != nil {
 		log.Println("err %v",err)
 	}
-    log.Println("sssh %v",i)
 
 }
 

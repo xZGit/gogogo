@@ -49,13 +49,15 @@ func (s *Server) RegisterTask(name string, handlerFunc HandleServerFunc, c chan 
 		}
 		rec := make(chan []string)
 		go s.redisClient.subConn.Subscribe(rec, name)
-
+		i:=0
 		var ls []string
 		c <- 1
 		for {
 			ls = <-rec
 			if ls[0]=="message" && len(ls)>2 {
-				go s.ProcessFunc(handlerFunc, ls[2])
+				i=i+1
+
+				go s.ProcessFunc(handlerFunc, ls[2], i)
 			}
 
 		}
@@ -65,14 +67,16 @@ func (s *Server) RegisterTask(name string, handlerFunc HandleServerFunc, c chan 
 
 
 
-func (s *Server) ProcessFunc(handlerFunc HandleServerFunc, ls string) {
+func (s *Server) ProcessFunc(handlerFunc HandleServerFunc, ls string,i int) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	mySlice := []byte(ls)
-	log.Printf("mySlice: %v\n", mySlice)
 	ev, err := unPackEventBytes(mySlice)
 	if err != nil {
 		panic(err)
 	}
+
 
 	v, err := (*handlerFunc)(ev.Args)
 	var resp Resp
@@ -81,10 +85,15 @@ func (s *Server) ProcessFunc(handlerFunc HandleServerFunc, ls string) {
 	}else {
 		resp = newResp(0,"",v)
 	}
+
 	msg, err :=resp.packBytes()
 
 //
 // 	go s.redisClient.getActiveSubPub()
-	log.Printf("result: %v\n", ev.MsgId)
-	s.redisClient.pubConn.Publish(ev.MsgId,msg)
+    d,err:= s.redisClient.pubConn.Publish("cc",msg)
+	if err != nil {
+		log.Printf("err: %v\n", err)
+	}else {
+	 log.Printf("re i: %d\n", d)
+	}
 }
