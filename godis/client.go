@@ -8,18 +8,32 @@ import(
 )
 
 
+
+// Task handler representation
+type taskHandler struct {
+	TaskId    string
+	HandlerFunc HandleClientFunc
+}
+
 type Client struct {
+	id string
 	redisClient   *RedisClient
 	mutex         sync.Mutex
-
+	HandleTasks [] *taskHandler
+	hasListen      bool
 }
 
 
 
-func NewClient(host string) (*Client) {
-	return  &Client{
+func NewClient(id string, host string) (*Client) {
+	client:=Client{
+		id:id,
 		redisClient:NewRedisClient(host),
+		HandleTasks :make([]*taskHandler, 0),
+		hasListen:false,
 	}
+
+	return &client
 }
 
 
@@ -27,54 +41,65 @@ func NewClient(host string) (*Client) {
 func (c *Client) Call(name string, handlerFunc HandleClientFunc, args ProtoType,n int)  error {
     c.mutex.Lock()
 	defer c.mutex.Unlock()
-	exit := make(chan int)
+	if(!c.hasListen){
+		go c.Listen()
+		c.hasListen = true
+	}
 	go func() {
 		c.redisClient.getActiveSubPub()
-		event, err := newEvent(args)
+		event, err := newEvent(c.id, args)
 		if err != nil {
 			panic(err)
 		}
-		rec := make(chan []string)
-		go c.redisClient.subConn.Subscribe(rec, "cc")
 		msg, err := event.packBytes()
-		c.redisClient.pubConn.Publish(name, msg)
-		var ls []string
-
-		for {
-			select {
-			case ls = <-rec:
-				if ls[0]=="message" && len(ls)>2 {
-					go c.redisClient.subConn.Unsubscribe(event.MsgId)
-					go c.ProcessFunc(handlerFunc, ls[2],exit,n)
-
-				}
-			case <-time.After(5 * time.Second):
-			//			println("timeout")
-				break
-			}
+		task:=taskHandler{
+			TaskId:event.MsgId,
+			HandlerFunc: handlerFunc,
 		}
+		c.HandleTasks=append(c.HandleTasks,&task)
+		c.redisClient.pubConn.Publish(name, msg)
 	}()
-	log.Println( <-exit)
 	return nil
 }
 
 
+func (c *Client) Listen() {
+     	i:=0
+		rec := make(chan []string)
+		go c.redisClient.subConn.Subscribe(rec, c.id)
+		var ls []string
+		for {
+			select {
+			case ls = <-rec:
+				if ls[0]=="message" && len(ls)>2 {
+					i=i+1
+					log.Printf(": %v\n", i)
+					go c.ProcessFunc(ls[2])
+				}
+			case <-time.After(5 * time.Second):
+//			 	println("timeout")
+				break
+			}
+		}
+}
 
-func (c *Client) ProcessFunc(handlerFunc HandleClientFunc, ls string, exit chan int,n int) {
 
-//	log.Printf("Client received: %v\n", ls)
+
+func (c *Client) ProcessFunc(ls string) {
+
 	mySlice := []byte(ls)
 
 	resp, err := unPackRespByte(mySlice)
 	if err != nil {
 		log.Printf("err: %v\n", err)
 	}
-	if(resp.Code!=0){
-		log.Println("return err %s",resp.ErrMsg)
-		return
+
+
+	for _, h := range  c.HandleTasks{
+		if h.TaskId == resp.MsgId{
+			(*h.HandlerFunc)(resp.RespInfo)
+		}
 	}
 
-	(*handlerFunc)(resp.Data)
-    exit <- n
 }
 

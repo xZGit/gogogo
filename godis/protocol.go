@@ -12,29 +12,35 @@ import
 
 type ProtoType map[interface{}]interface{}
 type HandleServerFunc *func(args ProtoType) (ProtoType, error)
-type HandleClientFunc *func(args ProtoType) (interface{}, error)
+type HandleClientFunc *func(args RespInfo) (interface{}, error)
 // Event representation
 type Event struct {
-	MsgId  string
-	Args   ProtoType
+	MId   string  //机器id
+	MsgId string
+	Args  ProtoType
 }
 
-
+type RespInfo struct{
+    Code   int64
+    Data   ProtoType
+    ErrMsg string
+}
 type Resp  struct {
-	Code   int64
-	Data   ProtoType
-	ErrMsg string
+	MsgId string
+	RespInfo RespInfo
 }
+
 
 
 // Returns a pointer to a new event,
 // a UUID V4 message_id is generated
-func newEvent(args ProtoType) (Event, error) {
+func newEvent(mId string, args ProtoType) (Event, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		panic(err)
 	}
 	e := Event{
+		MId: mId,
 		MsgId:  id.String(),
 		Args:   args,
 	}
@@ -42,37 +48,43 @@ func newEvent(args ProtoType) (Event, error) {
 }
 
 
-func newResp(code int64, err string, data ProtoType) (Resp){
-	r := Resp{
+func newResp(msgId string, code int64, err string, data ProtoType) (Resp) {
+	r := RespInfo{
 		Code: code,
-        Data: data,
+		Data: data,
 	}
-    if err!="" {
+	if err!="" {
 		r.ErrMsg=err
 	}
-	return r
+	resp := Resp{
+		MsgId:msgId,
+		RespInfo:r,
+	}
+	return resp
 }
 
 
 // Packs an event into MsgPack bytes
 func (r *Resp) packBytes() ([]byte, error) {
-	data := make([]interface{}, 2)
-	data[0] = r.Code
-	data[1] = r.Data
-	if len(r.ErrMsg)>0{
-		data = append(data, r.ErrMsg)
+	data := make([]interface{}, 3)
+	data[0] = r.MsgId
+	data[1] = r.RespInfo.Code
+	data[2] = r.RespInfo.Data
+	if len(r.RespInfo.ErrMsg)>0 {
+		data = append(data,r.RespInfo.ErrMsg)
 	}
-   return encode(data)
+	return encode(data)
 }
 
 
 
 // Packs an event into MsgPack bytes
 func (e *Event) packBytes() ([]byte, error) {
-	data := make([]interface{}, 2)
-	data[0] = e.MsgId
-	data[1] = e.Args
-    return encode(data)
+	data := make([]interface{}, 3)
+	data[0] =e.MId
+	data[1] = e.MsgId
+	data[2] = e.Args
+	return encode(data)
 }
 
 func encode(data []interface{}) ([]byte, error) {
@@ -104,20 +116,27 @@ func decode(b []byte) (interface{}, error) {
 //// Unpacks an event fom MsgPack bytes
 func unPackEventBytes(b []byte) (*Event, error) {
 
-	v, err :=decode(b)
+	v, err := decode(b)
 	if err != nil {
 		return nil, err
 	}
 
 	// get the event headers
-	h, ok := v.([]interface{})[0].([]byte)
+	m, ok := v.([]interface{})[0].([]byte)
 	if !ok {
 		return nil, errors.New("zerorpc/event interface conversion error")
 	}
+	// get the event headers
+	h, ok := v.([]interface{})[1].([]byte)
+	if !ok {
+		return nil, errors.New("zerorpc/event interface conversion error")
+	}
+
 	// get the event args
-	args :=convertValue(v.([]interface{})[1])
+	args := convertValue(v.([]interface{})[2])
 
 	e := Event{
+		MId:   string(m),
 		MsgId: string(h),
 		Args:  args.(map[interface{}]interface{}),
 	}
@@ -132,20 +151,24 @@ func unPackRespByte(b []byte) (*Resp, error) {
 	if err != nil {
 		return nil, err
 	}
-    code := convertValue(v.([]interface{})[0])
-	data := convertValue(v.([]interface{})[1])
-	r := Resp{
+	msgId := convertValue(v.([]interface{})[0])
+	code := convertValue(v.([]interface{})[1])
+	data := convertValue(v.([]interface{})[2])
+	r := RespInfo{
 		Code: code.(int64),
 	}
-	if (data!=nil){
+	if (data!=nil) {
 		r.Data = data.(map[interface{}]interface{})
 	}
-	if (len(v.([]interface{}))>2){
-		er := convertValue(v.([]interface{})[2])
+	if (len(v.([]interface{}))>3) {
+		er := convertValue(v.([]interface{})[3])
 		r.ErrMsg = er.(string)
 	}
-
-	return &r, nil
+	resp:= Resp{
+		MsgId: msgId.(string),
+	    RespInfo: r,
+	}
+	return &resp, nil
 }
 //
 //// Returns a pointer to a new heartbeat event
@@ -163,23 +186,23 @@ func convertValue(v interface{}) interface{} {
 	var out interface{}
 
 	switch t := v.(type) {
-	case []byte:
+		case []byte:
 		out = string(t)
 
-	case []interface{}:
+		case []interface{}:
 		for i, x := range t {
 			t[i] = convertValue(x)
 		}
 
 		out = t
 
-	case map[interface{}]interface{}:
+		case map[interface{}]interface{}:
 		for key, val := range v.(map[interface{}]interface{}) {
 			t[key] = convertValue(val)
 		}
 		out = t
 
-	default:
+		default:
 		out = t
 	}
 

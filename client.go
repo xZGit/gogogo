@@ -4,39 +4,36 @@ package main
 import (
 	"./godis"
     "errors"
-	"sync"
 	"log"
 
 )
 
+var d=0
 
-var waitgroup sync.WaitGroup
-
-func Afunction(shownum int) {
-	h := func(v godis.ProtoType) (interface{}, error){
-
-
+func Afunction(client *godis.Client, shownum int) {
+	h := func(v godis.RespInfo) (interface{}, error){
+		d=d+1
+		log.Println("done: %d",d)
 		return nil, errors.New("Ssss")
 	}
 
-
-	client:=godis.NewClient("127.0.0.1")
 	dd := make(godis.ProtoType)
 	dd["dd"]="fff"
 
 	client.Call("hello",&h,dd,shownum)
-    waitgroup.Done() //任务完成，将任务队列中的任务数量-1，其实.Done就是.Add(-1)
+
 }
 
 
 
 
 func main (){
-
+	c := make(chan int)
+	client:=godis.NewClient("1", "127.0.0.1")
 	for i := 0; i < 1000; i++ {
-			waitgroup.Add(1) //每创建一个goroutine，就把任务队列中任务的数量+1
-			go Afunction(i)
+			go Afunction(client,i)
 		}
-		waitgroup.Wait() //.Wait()这里会发生阻塞，直到队列中所有的任务结束就会解除阻塞
-     log.Println("finish!!!!")
+
+
+	log.Println("finish!!!!",<-c)
 }
