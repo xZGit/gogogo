@@ -5,6 +5,7 @@ import(
 	"sync"
     "log"
 	"time"
+	"gopkg.in/redis.v3"
 )
 
 
@@ -46,39 +47,58 @@ func (c *Client) Call(name string, handlerFunc HandleClientFunc, args ProtoType,
 		c.hasListen = true
 	}
 	go func() {
-		c.redisClient.getActiveSubPub()
+//		c.redisClient.getActiveSubPub()
 		event, err := newEvent(c.id, args)
 		if err != nil {
 			panic(err)
 		}
-		msg, err := event.packBytes()
+//		msg, err := event.packBytes()
 		task:=taskHandler{
 			TaskId:event.MsgId,
 			HandlerFunc: handlerFunc,
 		}
 		c.HandleTasks=append(c.HandleTasks,&task)
-		c.redisClient.pubConn.Publish(name, msg)
+//		log.Printf("msg: %v\n", msg)
+//		c.redisClient.pubConn.Publish(name, "hello11111111111111111111111111111111111111111")
+		c.redisClient.pubConn.Publish(name, "tt")
+//		if err != nil {
+//			log.Println("err %v",err)
+//		}else {
+////			log.Printf("send i: %v\n", n)
+//		}
+
 	}()
 	return nil
 }
 
 
 func (c *Client) Listen() {
-     	i:=0
-		rec := make(chan []string)
-		go c.redisClient.subConn.Subscribe(rec, c.id)
-		var ls []string
+
+	    pubsub, err := c.redisClient.subConn.Subscribe("mychannel")
+	   if err != nil {
+		 panic(err)
+	    }
+
 		for {
-			select {
-			case ls = <-rec:
-				if ls[0]=="message" && len(ls)>2 {
-					i=i+1
-					log.Printf(": %v\n", i)
-					go c.ProcessFunc(ls[2])
+			msgi, err := pubsub.ReceiveTimeout(100 * time.Millisecond)
+			if err != nil {
+				err := pubsub.Ping("")
+				if err != nil {
+					panic(err)
 				}
-			case <-time.After(5 * time.Second):
-//			 	println("timeout")
-				break
+				continue
+			}
+
+			switch msg := msgi.(type) {
+				case *redis.Subscription:
+				log.Println(msg.Kind, msg.Channel)
+				case *redis.Message:
+//				log.Println(msg.Channel, msg.Payload)
+			    go c.ProcessFunc(msg.Payload)
+				case *redis.Pong:
+//				log.Println(msg)
+				default:
+				log.Println("unknown message: %#v", msgi)
 			}
 		}
 }
@@ -87,19 +107,22 @@ func (c *Client) Listen() {
 
 func (c *Client) ProcessFunc(ls string) {
 
-	mySlice := []byte(ls)
-
-	resp, err := unPackRespByte(mySlice)
-	if err != nil {
-		log.Printf("err: %v\n", err)
+//	mySlice := []byte(ls)
+//
+//	resp, err := unPackRespByte(mySlice)
+//	if err != nil {
+//		log.Printf("err: %v\n", err)
+//	}
+	resp:= Resp{
+		MsgId: "2",
+//		RespInfo: r,
 	}
-
-
-	for _, h := range  c.HandleTasks{
-		if h.TaskId == resp.MsgId{
+	h:=c.HandleTasks[0]
+//	for _, h := range  c.HandleTasks{
+//		if h.TaskId == resp.MsgId{
 			(*h.HandlerFunc)(resp.RespInfo)
-		}
-	}
+//		}
+//	}
 
 }
 

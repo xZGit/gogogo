@@ -4,8 +4,7 @@ package godis
 import
 (
      "sync"
-	"menteslibres.net/gosexy/redis"
-	"log"
+     "gopkg.in/redis.v3"
 )
 
 
@@ -29,16 +28,22 @@ func NewRedisClient(host string) *RedisClient {
 //	host = fmt.Sprintf("%s:6379", host)
 	var conn, pubConn, subConn *redis.Client
 
-	conn = redis.New()
-	pubConn = redis.New()
-	subConn = redis.New()
-	err := conn.Connect(host,port)
-	err = pubConn.Connect(host,port)
-	err =subConn.Connect(host,port)
-	if err != nil {
-		log.Fatalf(" failed to connect: %s\n", err.Error())
-		panic(err)
-	}
+	conn = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	pubConn = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	subConn = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
 
 	//	pubsub, _ := redis.Dial("tcp", host)
 	client := & RedisClient{
@@ -54,11 +59,11 @@ func NewRedisClient(host string) *RedisClient {
 
 func (redisClient *RedisClient) getActiveSubPub() {
 
-	var i []string
-	err := redisClient.conn.Command(&i, "PUBSUB", "CHANNELS")
-	if err != nil {
-		log.Println("err %v",err)
-	}
+//	var i []string
+//	err := redisClient.conn.Command(&i, "PUBSUB", "CHANNELS")
+//	if err != nil {
+//		log.Println("err %v",err)
+//	}
 
 }
 
