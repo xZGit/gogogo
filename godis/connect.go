@@ -8,9 +8,6 @@ import
 )
 
 
-var host = "127.0.0.1"
-var port = uint(6379)
-
 type RedisClient struct {
 	conn  *redis.Client
 	pubConn  *redis.Client

@@ -66,23 +66,20 @@ func (s *Server) ProcessFunc(handlerFunc HandleServerFunc, ls string,i int) {
 	defer s.mutex.Unlock()
 
 
-//	mySlice := []byte(ls)
-//	ev, err := unPackEventBytes(mySlice)
-//	if err != nil {
-//		panic(err)
-//	}
-//	v, err := (*handlerFunc)(ev.Args)
-//	var resp Resp
-//	if err != nil {
-//		resp = newResp(ev.MsgId, 1, err.Error(), nil)
-//	}else {
-//		resp = newResp(ev.MsgId, 0, "", v)
-//	}
-//
-//	msg, err :=resp.packBytes()
-	i=i+1
+	mySlice := []byte(ls)
+	ev, err := unPackEventBytes(mySlice)
+	if err != nil {
+		panic(err)
+	}
+	v, err := (*handlerFunc)(ev.Args)
+	var resp Resp
+	if err != nil {
+		resp = newResp(ev.MsgId, 1, err.Error(), nil)
+	}else {
+		resp = newResp(ev.MsgId, 0, "", v)
+	}
 
-//	log.Println("resp %v",resp)
-    s.redisClient.pubConn.Publish("mychannel","fff")
+	msg, err :=resp.packBytes()
+    s.redisClient.pubConn.Publish(ev.MId, string(msg[:]))
 	log.Println("i %v",i)
 }
